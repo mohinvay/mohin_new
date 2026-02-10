@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<title>MOHIN 😎 – Premium</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link  href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI,sans-serif}
+body{background:radial-gradient(circle at top,#1e1b4b,#020617);color:#e5e7eb}
+
+.header{margin:16px;padding:22px;border-radius:20px;background:rgba(255,255,255,.08);text-align:center}
+.header h1{color:#c084fc}
+
+.admin{margin:16px;padding:16px;border-radius:16px;background:rgba(255,255,255,.06)}
+.admin input{width:100%;padding:12px;margin-bottom:8px;border:none;border-radius:10px}
+.admin img{width:100%;border-radius:12px;margin-bottom:8px;}
+.admin button{width:100%;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,#a855f7,#6366f1);color:white}
+
+.search{margin:16px}
+.search input{width:100%;padding:14px;border-radius:30px;border:none}
+
+.grid{padding:16px;display:grid;grid-template-columns:1fr;gap:16px}
+
+.card{background:rgba(255,255,255,.08);border-radius:20px;overflow:hidden;position:relative}
+.card img{width:100%;height:220px;object-fit:cover}
+.card-body{padding:14px}
+.card-title{margin-bottom:10px}
+.actions{display:flex;gap:10px}
+.open{flex:1;padding:12px;border:none;border-radius:30px;background:linear-gradient(135deg,#f97316,#22c55e);color:white;font-weight:700}
+.icon{width:44px;border:none;border-radius:50%;background:#020617;color:white;font-size:18px}
+.del{position:absolute;top:10px;right:10px;border:none;border-radius:50%;width:32px;height:32px}
+.views{margin-top:6px;font-size:13px;color:#c084fc}
+.login-btn{width:100%;padding:12px;margin:16px 0;border:none;border-radius:12px;background:linear-gradient(135deg,#facc15,#f97316);color:black;font-weight:700}
+
+/* Crop modal */
+#crop-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);justify-content:center;align-items:center;z-index:9999}
+#crop-modal img{max-width:100%;max-height:80vh;border-radius:12px}
+#crop-modal button{padding:8px 16px;margin-left:8px;border:none;border-radius:6px;cursor:pointer}
+
+/* Admin Login Modal */
+#admin-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);justify-content:center;align-items:center;z-index:9999;}
+#admin-modal div{background:#1e1b4b;color:white;padding:20px;border-radius:12px;max-width:400px;width:90%;text-align:center;}
+#admin-modal input{width:100%;padding:12px;border-radius:8px;border:none;margin-bottom:8px;}
+#admin-modal button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;}
+#admin-modal .login-btn{background:#22c55e;color:white;}
+#admin-modal .cancel-btn{background:#ef4444;color:white;}
+#show-pass-label{display:block;color:#fff;margin-bottom:12px;font-size:14px;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>MOHIN 😎</h1>
+  <p>Premium Access</p>
+</div>
+
+<!-- Admin Login Modal -->
+<div id="admin-modal">
+  <div>
+    <h2>Admin Login</h2>
+    <input id="admin-password" type="password" placeholder="Enter password">
+    <label id="show-pass-label">
+      <input type="checkbox" id="show-pass" onchange="togglePassword()"> Show Password
+    </label>
+    <div style="display:flex;gap:10px;">
+      <button class="login-btn" onclick="submitAdminPassword()">Login</button>
+      <button class="cancel-btn" onclick="closeAdminModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="admin" style="display:none;">
+  <h3>🧾 Admin Panel</h3>
+  <input id="t" placeholder="Title">
+  <input id="i" type="file" accept="image/*" onchange="previewImage(event)">
+  <img id="preview" style="display:none;">
+  <input id="l" placeholder="Link URL">
+  <button onclick="add()">Add Content</button>
+  <button onclick="logoutAdmin()" style="margin-top:8px;background:#ef4444;color:white;">Logout</button>
+</div>
+
+<!-- CROP MODAL -->
+<div id="crop-modal">
+  <div style="background:#fff;padding:16px;border-radius:12px;max-width:90%;max-height:90%;text-align:center;">
+    <img id="crop-image">
+    <div style="margin-top:12px;">
+      <button onclick="cropConfirm()" style="background:#22c55e;color:white;">Crop & Save</button>
+      <button onclick="cropCancel()" style="background:#ef4444;color:white;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEARCH -->
+<div class="search">
+  <input id="search" placeholder="Search title...">
+</div>
+
+<!-- CONTENT GRID -->
+<div class="grid" id="grid"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
+<script>
+// ===== CONFIG =====
+const AUTO_LOGOUT_TIME = 10*60*1000; // 10 mins
+const ADMIN_PASSWORDS = ["Derby**#886633","Derby**#9977557733"]; // plain text passwords
+
+let items=JSON.parse(localStorage.getItem("items")||"[]");
+let previewData="";
+let cropper;
+let role = localStorage.getItem("role")||"user";
+
+// ===== SHOW PASSWORD =====
+function togglePassword(){
+  const input = document.getElementById("admin-password");
+  input.type = input.type === "password" ? "text" : "password";
+}
+
+// ===== ADMIN LOGIN POPUP =====
+function openAdminModal(){ document.getElementById("admin-modal").style.display="flex"; }
+function closeAdminModal(){ document.getElementById("admin-modal").style.display="none"; document.getElementById("admin-password").value=""; }
+
+function submitAdminPassword(){
+  const pwd = document.getElementById("admin-password").value;
+  if(ADMIN_PASSWORDS.includes(pwd)){
+    role="admin";
+    localStorage.setItem("role","admin");
+    localStorage.setItem("adminLoginTime",Date.now());
+    alert("Admin Access Granted");
+    closeAdminModal();
+    init();
+  } else { alert("Wrong password!"); }
+}
+
+// ===== AUTO LOGOUT & ACTIVITY =====
+function checkAutoLogout(){
+  if(role!=="admin") return;
+  const last = localStorage.getItem("adminLoginTime");
+  if(!last) return;
+  if(Date.now() - last > AUTO_LOGOUT_TIME){ alert("Session expired. Logged out."); logoutAdmin(); }
+}
+
+function logoutAdmin(){
+  role="user";
+  localStorage.removeItem("role");
+  localStorage.removeItem("adminLoginTime");
+  init();
+}
+
+["click","mousemove","keydown","scroll","touchstart"].forEach(ev=>{
+  document.addEventListener(ev,()=>{ if(role==="admin"){ localStorage.setItem("adminLoginTime",Date.now()); }});
+});
+
+setInterval(checkAutoLogout,60000);
+
+// ===== INIT =====
+function init(){
+  document.querySelector(".admin").style.display = role==="admin"?"block":"none";
+  draw();
+}
+
+// ===== IMAGE CROP =====
+function previewImage(event){
+  const file = event.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    document.getElementById("crop-image").src = e.target.result;
+    document.getElementById("crop-modal").style.display = "flex";
+    if(cropper) cropper.destroy();
+    cropper = new Cropper(document.getElementById("crop-image"), { aspectRatio:1260/708, viewMode:1 });
+  }
+  reader.readAsDataURL(file);
+}
+
+function cropConfirm(){
+  const canvas = cropper.getCroppedCanvas({width:1260,height:708});
+  previewData = canvas.toDataURL("image/jpeg",0.9);
+  document.getElementById("preview").src = previewData; document.getElementById("preview").style.display="block";
+  document.getElementById("crop-modal").style.display="none"; cropper.destroy(); cropper=null;
+}
+function cropCancel(){ document.getElementById("crop-modal").style.display="none"; if(cropper){ cropper.destroy(); cropper=null; } document.getElementById("i").value=""; }
+
+// ===== ADD/DELETE CONTENT =====
+function add(){
+  if(!t.value || !previewData || !l.value){ alert("Fill all fields!"); return; }
+  if(!confirm("Add this content?")) return;
+  items.unshift({t:t.value,i:previewData,l:l.value,c:"All"});
+  localStorage.setItem("items",JSON.stringify(items));
+  t.value=""; l.value=""; i.value=""; previewData=""; document.getElementById("preview").style.display="none";
+  draw();
+}
+
+function del(i){
+  if(confirm("Delete this content?")){ items.splice(i,1); localStorage.setItem("items",JSON.stringify(items)); draw(); }
+}
+
+// ===== DRAW CONTENT =====
+function draw(){
+  grid.innerHTML="";
+  let val=search.value.toLowerCase().trim();
+  items.filter(x=>x.t.toLowerCase().includes(val)).forEach((x,i)=>{
+    let viewKey="views_"+x.l;
+    let views=parseInt(localStorage.getItem(viewKey)||0)+1;
+    localStorage.setItem(viewKey,views);
+    grid.innerHTML+=`
+    <div class="card">
+      ${role==="admin"?`<button class="del" onclick="del(${i})">❌</button>`:""}
+      <img src="${x.i}">
+      <div class="card-body">
+        <div class="card-title">${x.t}</div>
+        <div class="views">${views} views</div>
+        <div class="actions">
+          <button class="open" onclick="window.open('${x.l}','_blank')">Get Link</button>
+          <button class="icon" onclick="sharePost('${x.l}')">🔗</button>
+        </div>
+      </div>
+    </div>`;
+  });
+  if(val==="mohin" && role!=="admin"){ openAdminModal(); }
+}
+
+search.oninput=draw;
+
+// ===== SHARE =====
+function sharePost(link){ const url=`${window.location.origin}${window.location.pathname}?post=${encodeURIComponent(link)}`; prompt("Copy & share URL:", url); }
+
+init();
+</script>
+</body>
+</html>
